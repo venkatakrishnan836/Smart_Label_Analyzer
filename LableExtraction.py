@@ -6,7 +6,6 @@ import re
 import dateparser
 from datetime import datetime
 
-# Load the processor and model
 model_id = "meta-llama/Llama-3.2-11B-Vision-Instruct"
 processor = AutoProcessor.from_pretrained(model_id)
 model = MllamaForConditionalGeneration.from_pretrained(
@@ -15,21 +14,17 @@ model = MllamaForConditionalGeneration.from_pretrained(
     device_map="auto",
 )
 
-# Function to process images from a folder
 def process_images_from_folder(folder_path):
-    # Get the current date
     current_date = datetime.now().strftime('%d/%m/%Y')
 
     for image_filename in os.listdir(folder_path):
         image_path = os.path.join(folder_path, image_filename)
         
-        if not image_filename.lower().endswith(('.png', '.jpg', '.jpeg')):  # Check for image files
+        if not image_filename.lower().endswith(('.png', '.jpg', '.jpeg')): 
             continue
-
-        # Open the image
+            
         image = Image.open(image_path)
-
-        # Prepare the prompt and message
+        
         messages = [
             {
                 "role": "user", 
@@ -60,28 +55,22 @@ expired or not (considering current date {current_date}):
             }
         ]
 
-        # Apply the processor chat template to the image and text
         input_text = processor.apply_chat_template(messages, add_generation_prompt=True)
-        
-        # Prepare the inputs for the model (image + prompt)
+    
         inputs = processor(
             image,
             input_text,
             add_special_tokens=False,
             return_tensors="pt"
-        ).to(model.device)  # Ensure tensors are on the same device as the model
+        ).to(model.device) 
         
-        # Generate output from the model
         output = model.generate(**inputs, max_new_tokens=200)
 
-        # Decode the generated output to text
         generated_text = processor.decode(output[0], skip_special_tokens=True).strip()
 
-        # Remove the prompt from the output
         prompt_length = len(processor.decode(inputs["input_ids"][0], skip_special_tokens=True).strip())
         output_text = generated_text[prompt_length:].strip()
 
-        # Use regular expressions to extract information
         mrp = re.search(r"MRP: (\d+(?:\.\d+)?)", output_text)
         mfg_date = re.search(r"Manufacture Date: (\d{1,2}/\d{1,2}/\d{2,4})", output_text)
         exp_date = re.search(r"Expiry Date: (\d{1,2}/\d{1,2}/\d{2,4})", output_text)
@@ -90,7 +79,7 @@ expired or not (considering current date {current_date}):
         expiry_status = re.search(r"expired or not: (.+)", output_text)
 
         if mrp and mfg_date and exp_date and net_weight and brand_name and expiry_status:
-            # Normalize dates
+    
             mfg_date = dateparser.parse(mfg_date.group(1))
             exp_date = dateparser.parse(exp_date.group(1))
 
@@ -107,5 +96,4 @@ expired or not (considering current date {current_date}):
 # Specify the folder path containing the images
 folder_path = "folder path"
 
-# Process all images in the folder
 process_images_from_folder(folder_path)
